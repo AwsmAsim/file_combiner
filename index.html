@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combine Files App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-4 text-center">Combine Files</h1>
+        <div class="space-y-4">
+            <div>
+                <label for="folderInput" class="block text-sm font-medium text-gray-700">Select Folder</label>
+                <input type="file" id="folderInput" webkitdirectory directory multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+            </div>
+            <div>
+                <label for="excludeFiles" class="block text-sm font-medium text-gray-700">Exclude Files (comma-separated names, e.g., file1.js,file2.txt)</label>
+                <input type="text" id="excludeFiles" placeholder="e.g., file1.js,file2.txt" value=".env" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            </div>
+            <div>
+                <label for="ignoreFolders" class="block text-sm font-medium text-gray-700">Ignore Folders (comma-separated names, e.g., dist,build)</label>
+                <input type="text" id="ignoreFolders" placeholder="e.g., dist,build (node_modules is always ignored)" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            </div>
+            <div>
+                <label for="ignoreExtensions" class="block text-sm font-medium text-gray-700">Ignore File Extensions (comma-separated, e.g., wav,mp3)</label>
+                <input type="text" id="ignoreExtensions" placeholder="e.g., wav,mp3" value="wav,mp3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            </div>
+            <div>
+                <label for="outputFile" class="block text-sm font-medium text-gray-700">Output File Name</label>
+                <input type="text" id="outputFile" placeholder="e.g., combined_output.txt" value="combined_output.txt" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            </div>
+            <button onclick="combineFiles()" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Combine Files</button>
+            <p id="result" class="mt-4 text-sm text-gray-600"></p>
+            <a id="downloadLink" class="hidden mt-2 text-sm text-indigo-600 hover:underline" download>Download Combined File</a>
+        </div>
+    </div>
+
+    <script>
+        async function combineFiles() {
+            const folderInput = document.getElementById('folderInput');
+            const excludeFiles = document.getElementById('excludeFiles').value.split(',').map(f => f.trim()).filter(f => f);
+            const ignoreFolders = document.getElementById('ignoreFolders').value.split(',').map(f => f.trim()).filter(f => f);
+            const ignoreExtensions = document.getElementById('ignoreExtensions').value.split(',').map(e => e.trim()).filter(e => e);
+            const outputFile = document.getElementById('outputFile').value || 'combined_output.txt';
+            const resultEl = document.getElementById('result');
+            const downloadLink = document.getElementById('downloadLink');
+
+            if (!folderInput.files.length) {
+                resultEl.textContent = 'Please select a folder.';
+                resultEl.className = 'mt-4 text-sm text-red-600';
+                return;
+            }
+
+            resultEl.textContent = 'Processing...';
+            resultEl.className = 'mt-4 text-sm text-gray-600';
+            downloadLink.className = 'hidden';
+
+            try {
+                const formData = new FormData();
+                const filePaths = [];
+                Array.from(folderInput.files).forEach(file => {
+                    console.log("File relative path");
+                    console.log(file.webkitRelativePath);
+                    formData.append('files', file, pathBasename(file.webkitRelativePath));
+                    filePaths.push(file.webkitRelativePath);
+                });
+                formData.append('filePaths', JSON.stringify(filePaths));
+                formData.append('excludeFiles', JSON.stringify(excludeFiles));
+                formData.append('ignoreFolders', JSON.stringify(ignoreFolders));
+                formData.append('ignoreExtensions', JSON.stringify(ignoreExtensions));
+                formData.append('outputFile', outputFile);
+
+                const response = await fetch('/combine', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error((await response.json()).error || 'Failed to combine files.');
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.download = outputFile;
+                downloadLink.textContent = `Download ${outputFile}`;
+                downloadLink.className = 'mt-2 text-sm text-indigo-600 hover:underline';
+
+                resultEl.textContent = 'Files combined successfully!';
+                resultEl.className = 'mt-4 text-sm text-green-600';
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                resultEl.className = 'mt-4 text-sm text-red-600';
+            }
+        }
+
+        // Polyfill for path.basename (browser doesn't have Node.js path module)
+        function pathBasename(filePath) {
+            return filePath.split(/[\/\\]/).pop();
+        }
+    </script>
+</body>
+</html>
