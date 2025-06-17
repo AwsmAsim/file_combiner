@@ -35,7 +35,7 @@ A simple web application to combine text files from a selected folder into a sin
 
 3. **Project Structure**:
    ```
-   your-repo-name/
+   file_combiner/
    ├── index.html
    ├── server.js
    ├── combiner_recording.gif
